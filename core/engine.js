@@ -37,6 +37,20 @@ export function createEngine(canvasEl, options = {}) {
     state.snapType = null;
     const scale = viewport.getScale();
 
+    // When drawing a polyline, prefer snapping to its first point so closing is reliable
+    if (currentToolId === 'line') {
+      const lineTool = toolsById['line'];
+      const current = lineTool?.getCurrentPoints?.() ?? [];
+      if (current.length >= 2) {
+        const first = current[0];
+        if (distance(worldMouse, first) < SNAP_DIST / scale) {
+          state.snapPoint = first;
+          state.snapType = 'Start';
+          return getSnap();
+        }
+      }
+    }
+
     for (const line of state.polylines) {
       for (let i = 0; i < line.length - 1; i++) {
         const a = line[i];
