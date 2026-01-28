@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Lightweight Web CAD – Phase 1</title>
+
+    <style>
+      body {
+        margin: 0;
+        height: 100vh;
+        background: #e5e5e5;
+        font-family: Arial, sans-serif;
+      }
+
+      #app {
+        display: flex;
+        height: 100vh;
+      }
+
+      /* LEFT TOOLBAR */
+      #toolbar {
+        width: 80px;
+        background: #2c2c2c;
+        display: flex;
+        flex-direction: column;
+        padding: 10px;
+        gap: 10px;
+      }
+
+      .tool {
+        padding: 10px;
+        border: none;
+        background: #444;
+        color: white;
+        cursor: pointer;
+        border-radius: 4px;
+      }
+
+      .tool:hover {
+        background: #666;
+      }
+
+      .tool.active {
+        background: #1e90ff;
+      }
+
+      /* WORKSPACE */
+      #container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      }
+
+      #label {
+        margin-bottom: 10px;
+        font-size: 14px;
+        color: #444;
+      }
+
+      canvas {
+        width: 840px;
+        height: 594px;
+        background: white;
+        border: 2px solid #333;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+        cursor: crosshair;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="app">
+      <!-- LEFT TOOLBAR -->
+      <div id="toolbar">
+        <button id="tool-line" class="tool active">Line</button>
+        <button id="tool-select" class="tool">Select</button>
+      </div>
+
+      <!-- DRAWING AREA -->
+      <div id="container">
+        <div id="label">A3 Paper – Scale 1:100</div>
+        <canvas id="canvas" width="840" height="594"></canvas>
+      </div>
+    </div>
+
+    <script type="module" src="./index.js"></script>
+  </body>
+</html>
