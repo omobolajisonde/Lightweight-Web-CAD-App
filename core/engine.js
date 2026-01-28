@@ -4,7 +4,18 @@
 
 import { createViewport } from './viewport.js';
 import { createTools } from '../tools/index.js';
-import { distance, SNAP_DIST, HANDLE_SIZE } from '../utils/math.js';
+import { buildStructuredDrawing } from './export.js';
+import {
+  distance,
+  SNAP_DIST,
+  HANDLE_SIZE,
+  GRID_SPACING,
+  snapToGrid,
+  distanceToGrid,
+  isClosedPolyline,
+  polygonArea,
+  MM2_TO_M2,
+} from '../utils/math.js';
 
 /**
  * @param {HTMLCanvasElement} canvasEl
@@ -21,6 +32,8 @@ export function createEngine(canvasEl, options = {}) {
     mouse: { x: 0, y: 0 },
     snapPoint: null,
     snapType: null,
+    gridEnabled: true,
+    gridSpacing: options.gridSpacing ?? GRID_SPACING,
   };
 
   const tools = createTools({ getState: () => state, viewport });
@@ -74,6 +87,13 @@ export function createEngine(canvasEl, options = {}) {
           return getSnap();
         }
       }
+    }
+
+    // Phase 2: grid snapping (lowest priority)
+    if (state.gridEnabled && distanceToGrid(worldMouse, state.gridSpacing) < SNAP_DIST / scale) {
+      state.snapPoint = snapToGrid(worldMouse, state.gridSpacing);
+      state.snapType = 'Grid';
+      return getSnap();
     }
     return null;
   }
@@ -154,11 +174,27 @@ export function createEngine(canvasEl, options = {}) {
     if (tool.onClick && tool.onClick(toolCtx)) return;
   });
 
+  canvasEl.addEventListener('dblclick', () => {
+    const lineTool = toolsById['line'];
+    if (currentToolId !== 'line' || !lineTool) return;
+    const current = lineTool.getCurrentPoints?.() ?? [];
+    if (current.length >= 2) {
+      state.polylines.push(current.map((p) => ({ x: p.x, y: p.y })));
+      lineTool.deactivate?.();
+    }
+  });
+
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       const lineTool = toolsById['line'];
-      if (lineTool?.getCurrentPoints?.()?.length > 0) {
+      const current = lineTool?.getCurrentPoints?.() ?? [];
+      if (current.length >= 2) {
+        state.polylines.push(current.map((p) => ({ x: p.x, y: p.y })));
         lineTool.deactivate?.();
+        return;
+      }
+      if (current.length === 1) {
+        lineTool?.deactivate?.();
         return;
       }
       if (currentToolId === 'line') {
@@ -186,9 +222,43 @@ export function createEngine(canvasEl, options = {}) {
     ctx.stroke();
   }
 
+  function drawGrid() {
+    const scale = viewport.getScale();
+    const offset = viewport.getOffset();
+    const spacing = state.gridSpacing;
+    const invScale = 1 / scale;
+    const left = (-offset.x) * invScale;
+    const right = (canvasEl.width - offset.x) * invScale;
+    const top = (-offset.y) * invScale;
+    const bottom = (canvasEl.height - offset.y) * invScale;
+    const minX = Math.floor(left / spacing) * spacing;
+    const maxX = Math.ceil(right / spacing) * spacing;
+    const minY = Math.floor(top / spacing) * spacing;
+    const maxY = Math.ceil(bottom / spacing) * spacing;
+
+    ctx.strokeStyle = '#e0e0e0';
+    ctx.lineWidth = 1;
+    for (let x = minX; x <= maxX; x += spacing) {
+      const s = viewport.toScreen({ x, y: 0 });
+      ctx.beginPath();
+      ctx.moveTo(s.x, 0);
+      ctx.lineTo(s.x, canvasEl.height);
+      ctx.stroke();
+    }
+    for (let y = minY; y <= maxY; y += spacing) {
+      const s = viewport.toScreen({ x: 0, y });
+      ctx.beginPath();
+      ctx.moveTo(0, s.y);
+      ctx.lineTo(canvasEl.width, s.y);
+      ctx.stroke();
+    }
+  }
+
   function draw() {
     ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
     const scale = viewport.getScale();
+
+    if (state.gridEnabled) drawGrid();
 
     state.polylines.forEach((line) => {
       if (state.selectedLines.includes(line)) {
@@ -243,6 +313,30 @@ export function createEngine(canvasEl, options = {}) {
 
   draw();
 
+  /** Phase 1: Export drawing to structured JSON */
+  function exportDrawing() {
+    const structured = buildStructuredDrawing(state.polylines);
+    return JSON.stringify(structured, null, 2);
+  }
+
+  /** Phase 2: When exactly one closed polygon is selected, return area in m²; otherwise null */
+  function getSelectionAreaInfo() {
+    if (state.selectedLines.length !== 1) return null;
+    const line = state.selectedLines[0];
+    if (!isClosedPolyline(line)) return null;
+    const areaMm2 = polygonArea(line);
+    const areaM2 = areaMm2 * MM2_TO_M2;
+    return { area: areaM2 };
+  }
+
+  function setGridEnabled(enabled) {
+    state.gridEnabled = !!enabled;
+  }
+
+  function getGridEnabled() {
+    return state.gridEnabled;
+  }
+
   return {
     viewport,
     setTool,
@@ -250,5 +344,9 @@ export function createEngine(canvasEl, options = {}) {
     getTools: () => tools,
     getPolylines: () => state.polylines,
     getSelectedLines: () => state.selectedLines,
+    exportDrawing,
+    getSelectionAreaInfo,
+    setGridEnabled,
+    getGridEnabled,
   };
 }

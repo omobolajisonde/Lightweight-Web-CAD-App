@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Lightweight Web CAD – Phase 1</title>
+    <title>Lightweight Web CAD – Phase 1 & 2</title>
 
     <style>
       body {
@@ -53,10 +53,58 @@
         align-items: center;
       }
 
-      #label {
+      #top-bar {
+        display: flex;
+        align-items: center;
+        gap: 16px;
         margin-bottom: 10px;
+        flex-wrap: wrap;
+      }
+
+      #label {
         font-size: 14px;
         color: #444;
+      }
+
+      #area-display {
+        font-size: 14px;
+        color: #1976d2;
+        font-weight: 600;
+      }
+
+      #area-display.empty {
+        color: #888;
+        font-weight: normal;
+      }
+
+      .grid-option {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: #444;
+      }
+
+      .btn {
+        padding: 8px 14px;
+        border: none;
+        background: #2c2c2c;
+        color: white;
+        cursor: pointer;
+        border-radius: 4px;
+        font-size: 13px;
+      }
+
+      .btn:hover {
+        background: #444;
+      }
+
+      .btn.primary {
+        background: #1e90ff;
+      }
+
+      .btn.primary:hover {
+        background: #1a7fd9;
       }
 
       canvas {
@@ -80,7 +128,16 @@
 
       <!-- DRAWING AREA -->
       <div id="container">
-        <div id="label">A3 Paper – Scale 1:100</div>
+        <div id="top-bar">
+          <span id="label">A3 Paper – Scale 1:100 (mm), area in m²</span>
+          <span id="area-display" class="empty">Select a closed shape for area</span>
+          <span id="line-hint" style="font-size: 12px; color: #666;">Line: Esc or double‑click to finish</span>
+          <label class="grid-option">
+            <input type="checkbox" id="grid-toggle" checked />
+            Grid snap
+          </label>
+          <button id="btn-export" class="btn primary">Export JSON</button>
+        </div>
         <canvas id="canvas" width="840" height="594"></canvas>
       </div>
     </div>
