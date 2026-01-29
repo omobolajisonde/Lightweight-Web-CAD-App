@@ -6,6 +6,7 @@ import {
   distance,
   pointToSegmentDistance,
   lineInBox,
+  segmentIntersectsBox,
   HANDLE_SIZE,
   HIT_TOLERANCE,
 } from '../utils/math.js';
@@ -133,11 +134,32 @@ export function createSelectTool(engine) {
         x2: selectEnd.x,
         y2: selectEnd.y,
       };
-      const crossing = box.x2 < box.x1;
+      // Crossing selection: right-to-left OR bottom-to-top (CAD standard)
+      const crossing = box.x2 < box.x1 || box.y2 < box.y1;
       const nextSelection = [];
-      for (const line of polylines) {
-        if (lineInBox(line, box, crossing)) nextSelection.push(line);
+      
+      if (crossing) {
+        // Crossing selection: only select segments that actually intersect the box
+        // This is CAD-standard behavior - back-select only touches what it crosses
+        for (const line of polylines) {
+          let hasIntersectingSegment = false;
+          for (let i = 0; i < line.length - 1; i++) {
+            if (segmentIntersectsBox(line[i], line[i + 1], box)) {
+              hasIntersectingSegment = true;
+              break;
+            }
+          }
+          if (hasIntersectingSegment) {
+            nextSelection.push(line);
+          }
+        }
+      } else {
+        // Window selection: all points must be inside (existing behavior)
+        for (const line of polylines) {
+          if (lineInBox(line, box, false)) nextSelection.push(line);
+        }
       }
+      
       setSelectedLines(nextSelection);
       isSelecting = false;
       selectStart = null;

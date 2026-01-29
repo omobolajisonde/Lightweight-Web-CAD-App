@@ -188,6 +188,8 @@ export function createEngine(canvasEl, options = {}) {
     if (e.key === 'Escape') {
       const lineTool = toolsById['line'];
       const current = lineTool?.getCurrentPoints?.() ?? [];
+      
+      // If drawing a line, handle line-specific ESC behavior
       if (current.length >= 2) {
         state.polylines.push(current.map((p) => ({ x: p.x, y: p.y })));
         lineTool.deactivate?.();
@@ -197,6 +199,14 @@ export function createEngine(canvasEl, options = {}) {
         lineTool?.deactivate?.();
         return;
       }
+      
+      // If not drawing: ESC clears selection first (standard CAD behavior)
+      if (state.selectedLines.length > 0) {
+        state.selectedLines.length = 0;
+        return;
+      }
+      
+      // If in line tool with nothing selected, switch to select
       if (currentToolId === 'line') {
         setTool('select');
         return;
