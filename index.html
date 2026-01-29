@@ -136,6 +136,12 @@
             <input type="checkbox" id="grid-toggle" checked />
             Grid snap
           </label>
+          <div id="fill-controls" style="display: none; align-items: center; gap: 8px;">
+            <label style="font-size: 13px; color: #444;">Fill:</label>
+            <input type="color" id="fill-color-picker" value="#e0e0e0" style="width: 40px; height: 28px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;" />
+            <button id="btn-fill-apply" class="btn" style="padding: 6px 12px; font-size: 12px;">Apply</button>
+            <button id="btn-fill-clear" class="btn" style="padding: 6px 12px; font-size: 12px;">Clear</button>
+          </div>
           <button id="btn-export" class="btn primary">Export JSON</button>
         </div>
         <canvas id="canvas" width="840" height="594"></canvas>

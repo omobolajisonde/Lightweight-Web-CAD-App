@@ -17,6 +17,7 @@ import {
  */
 export function createSelectTool(engine) {
   let hoveredLine = null;
+  let hoveredSegment = null; // { polyline, segmentIndex }
   let hoveredHandle = null;
   let activeHandle = null;
   let isSelecting = false;
@@ -24,7 +25,7 @@ export function createSelectTool(engine) {
   let selectEnd = null;
   let isDragging = false;
   let dragStartWorld = null;
-  let dragOriginalLines = null;
+  let dragOriginalSegments = null; // Store original positions of selected segments
   let didJustFinishBoxSelect = false;
 
   return {
@@ -32,19 +33,25 @@ export function createSelectTool(engine) {
     name: 'Select',
 
     onMouseMove(ctx) {
-      const { viewport, worldMouse, polylines, selectedLines, setHoveredLine } = ctx;
+      const { viewport, worldMouse, polylines, selectedSegments, setHoveredLine, setHoveredSegment } = ctx;
       const scale = viewport.getScale();
 
       setHoveredLine(null);
+      setHoveredSegment(null);
 
       if (isDragging) {
         const dx = worldMouse.x - dragStartWorld.x;
         const dy = worldMouse.y - dragStartWorld.y;
-        selectedLines.forEach((line, i) => {
-          line.forEach((p, j) => {
-            p.x = dragOriginalLines[i][j].x + dx;
-            p.y = dragOriginalLines[i][j].y + dy;
-          });
+        // Move endpoints of selected segments
+        selectedSegments.forEach((seg, i) => {
+          const orig = dragOriginalSegments[i];
+          const { polyline, segmentIndex } = seg;
+          if (segmentIndex < polyline.length - 1) {
+            polyline[segmentIndex].x = orig.start.x + dx;
+            polyline[segmentIndex].y = orig.start.y + dy;
+            polyline[segmentIndex + 1].x = orig.end.x + dx;
+            polyline[segmentIndex + 1].y = orig.end.y + dy;
+          }
         });
         return;
       }
@@ -60,46 +67,52 @@ export function createSelectTool(engine) {
         return;
       }
 
-      // Hit test handles first
+      // Hit test handles first (from selected segments)
       hoveredHandle = null;
-      for (const line of selectedLines) {
-        for (const p of line) {
-          if (distance(worldMouse, p) < HANDLE_SIZE / scale) {
-            hoveredHandle = { line, point: p };
-            return;
-          }
+      const selectedPoints = new Set();
+      selectedSegments.forEach(({ polyline, segmentIndex }) => {
+        if (segmentIndex < polyline.length - 1) {
+          selectedPoints.add(polyline[segmentIndex]);
+          selectedPoints.add(polyline[segmentIndex + 1]);
+        }
+      });
+      for (const p of selectedPoints) {
+        if (distance(worldMouse, p) < HANDLE_SIZE / scale) {
+          hoveredHandle = { point: p };
+          return;
         }
       }
 
       // Then hit test segments
-      hoveredLine = null;
+      hoveredSegment = null;
       for (const line of polylines) {
         for (let i = 0; i < line.length - 1; i++) {
           const d = pointToSegmentDistance(worldMouse, line[i], line[i + 1]);
           if (d < HIT_TOLERANCE / scale) {
-            hoveredLine = line;
-            setHoveredLine(line);
+            hoveredSegment = { polyline: line, segmentIndex: i };
+            setHoveredSegment(hoveredSegment);
             return;
           }
         }
       }
-      setHoveredLine(null);
+      setHoveredSegment(null);
     },
 
     onMouseDown(ctx) {
-      const { worldMouse, selectedLines } = ctx;
+      const { worldMouse, selectedSegments } = ctx;
 
       if (hoveredHandle) {
         activeHandle = hoveredHandle;
         return true;
       }
 
-      if (hoveredLine && selectedLines.includes(hoveredLine)) {
+      if (hoveredSegment && selectedSegments.some((s) => s.polyline === hoveredSegment.polyline && s.segmentIndex === hoveredSegment.segmentIndex)) {
         isDragging = true;
         dragStartWorld = worldMouse;
-        dragOriginalLines = selectedLines.map((line) =>
-          line.map((p) => ({ x: p.x, y: p.y }))
-        );
+        dragOriginalSegments = selectedSegments.map(({ polyline, segmentIndex }) => ({
+          start: { x: polyline[segmentIndex].x, y: polyline[segmentIndex].y },
+          end: { x: polyline[segmentIndex + 1].x, y: polyline[segmentIndex + 1].y },
+        }));
         return true;
       }
 
@@ -110,7 +123,7 @@ export function createSelectTool(engine) {
     },
 
     onMouseUp(ctx) {
-      const { polylines, setSelectedLines } = ctx;
+      const { polylines, setSelectedSegments } = ctx;
 
       if (activeHandle) {
         activeHandle = null;
@@ -119,7 +132,7 @@ export function createSelectTool(engine) {
 
       if (isDragging) {
         isDragging = false;
-        dragOriginalLines = null;
+        dragOriginalSegments = null;
         return true;
       }
 
@@ -139,28 +152,28 @@ export function createSelectTool(engine) {
       const nextSelection = [];
       
       if (crossing) {
-        // Crossing selection: only select segments that actually intersect the box
+        // Crossing selection: select individual segments that intersect the box
         // This is CAD-standard behavior - back-select only touches what it crosses
         for (const line of polylines) {
-          let hasIntersectingSegment = false;
           for (let i = 0; i < line.length - 1; i++) {
             if (segmentIntersectsBox(line[i], line[i + 1], box)) {
-              hasIntersectingSegment = true;
-              break;
+              nextSelection.push({ polyline: line, segmentIndex: i });
             }
-          }
-          if (hasIntersectingSegment) {
-            nextSelection.push(line);
           }
         }
       } else {
-        // Window selection: all points must be inside (existing behavior)
+        // Window selection: select all segments of polylines where all points are inside
         for (const line of polylines) {
-          if (lineInBox(line, box, false)) nextSelection.push(line);
+          if (lineInBox(line, box, false)) {
+            // Select all segments of this polyline
+            for (let i = 0; i < line.length - 1; i++) {
+              nextSelection.push({ polyline: line, segmentIndex: i });
+            }
+          }
         }
       }
       
-      setSelectedLines(nextSelection);
+      setSelectedSegments(nextSelection);
       isSelecting = false;
       selectStart = null;
       selectEnd = null;
@@ -169,14 +182,14 @@ export function createSelectTool(engine) {
     },
 
     onClick(ctx) {
-      const { setSelectedLines } = ctx;
+      const { setSelectedSegments } = ctx;
       if (didJustFinishBoxSelect) {
         didJustFinishBoxSelect = false;
-        return true; // consume click so we don't replace box selection with single-line
+        return true; // consume click so we don't replace box selection with single-segment
       }
       if (isSelecting || isDragging || activeHandle) return false;
-      if (hoveredLine) {
-        setSelectedLines([hoveredLine]);
+      if (hoveredSegment) {
+        setSelectedSegments([hoveredSegment]);
         return true;
       }
       return false;

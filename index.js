@@ -11,6 +11,10 @@ const selectBtn = document.getElementById('tool-select');
 const gridToggle = document.getElementById('grid-toggle');
 const btnExport = document.getElementById('btn-export');
 const areaDisplay = document.getElementById('area-display');
+const fillControls = document.getElementById('fill-controls');
+const fillColorPicker = document.getElementById('fill-color-picker');
+const btnFillApply = document.getElementById('btn-fill-apply');
+const btnFillClear = document.getElementById('btn-fill-clear');
 
 const engine = createEngine(canvas, {
   initialScale: 1 / 100,
@@ -49,4 +53,50 @@ function updateAreaDisplay() {
     areaDisplay.classList.add('empty');
   }
 }
-setInterval(updateAreaDisplay, 150);
+
+function updateFillControls() {
+  const selectedSegments = engine.getSelectedSegments();
+  const uniquePolylines = [...new Set(selectedSegments.map((s) => s.polyline))];
+  
+  // Show fill controls if exactly one closed polyline is selected
+  if (uniquePolylines.length === 1) {
+    const polyline = uniquePolylines[0];
+    const isClosed = polyline.length >= 3 && 
+      Math.hypot(
+        polyline[0].x - polyline[polyline.length - 1].x,
+        polyline[0].y - polyline[polyline.length - 1].y
+      ) < 1; // Closed tolerance
+    
+    if (isClosed) {
+      fillControls.style.display = 'flex';
+      const currentColor = engine.getPolylineFillColor(polyline);
+      if (currentColor) {
+        fillColorPicker.value = currentColor;
+      }
+      return;
+    }
+  }
+  
+  fillControls.style.display = 'none';
+}
+
+btnFillApply.addEventListener('click', () => {
+  const selectedSegments = engine.getSelectedSegments();
+  const uniquePolylines = [...new Set(selectedSegments.map((s) => s.polyline))];
+  if (uniquePolylines.length === 1) {
+    engine.setPolylineFillColor(uniquePolylines[0], fillColorPicker.value);
+  }
+});
+
+btnFillClear.addEventListener('click', () => {
+  const selectedSegments = engine.getSelectedSegments();
+  const uniquePolylines = [...new Set(selectedSegments.map((s) => s.polyline))];
+  if (uniquePolylines.length === 1) {
+    engine.setPolylineFillColor(uniquePolylines[0], null);
+  }
+});
+
+setInterval(() => {
+  updateAreaDisplay();
+  updateFillControls();
+}, 150);

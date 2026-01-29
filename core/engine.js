@@ -27,8 +27,10 @@ export function createEngine(canvasEl, options = {}) {
 
   const state = {
     polylines: [],
-    selectedLines: [],
+    polylineFillColors: new Map(), // Map<polyline, fillColor> for closed regions
+    selectedSegments: [], // [{ polyline, segmentIndex }, ...] for segment-level selection
     hoveredLine: null,
+    hoveredSegment: null, // { polyline, segmentIndex } for segment hover
     mouse: { x: 0, y: 0 },
     snapPoint: null,
     snapType: null,
@@ -105,21 +107,50 @@ export function createEngine(canvasEl, options = {}) {
       mouse: state.mouse,
       worldMouse,
       polylines: state.polylines,
-      selectedLines: state.selectedLines,
+      selectedSegments: state.selectedSegments,
+      setSelectedSegments(segments) {
+        state.selectedSegments.length = 0;
+        state.selectedSegments.push(...segments);
+      },
       setSelectedLines(lines) {
-        state.selectedLines.length = 0;
-        state.selectedLines.push(...lines);
+        // Legacy: convert polylines to all their segments
+        const segments = [];
+        for (const line of lines) {
+          for (let i = 0; i < line.length - 1; i++) {
+            segments.push({ polyline: line, segmentIndex: i });
+          }
+        }
+        state.selectedSegments.length = 0;
+        state.selectedSegments.push(...segments);
       },
       setHoveredLine(line) {
         state.hoveredLine = line;
+        state.hoveredSegment = null;
+      },
+      setHoveredSegment(segment) {
+        state.hoveredSegment = segment;
+        state.hoveredLine = segment?.polyline ?? null;
       },
       getSnap,
       addPolyline(points) {
         state.polylines.push(points);
       },
+      setPolylineFillColor(polyline, color) {
+        if (color) {
+          state.polylineFillColors.set(polyline, color);
+        } else {
+          state.polylineFillColors.delete(polyline);
+        }
+      },
+      getPolylineFillColor(polyline) {
+        return state.polylineFillColors.get(polyline) || null;
+      },
       removePolylines(lines) {
         state.polylines = state.polylines.filter((l) => !lines.includes(l));
-        state.selectedLines = state.selectedLines.filter((l) => !lines.includes(l));
+        state.selectedSegments = state.selectedSegments.filter(
+          (s) => !lines.includes(s.polyline)
+        );
+        lines.forEach((line) => state.polylineFillColors.delete(line));
       },
     };
   }
@@ -201,8 +232,8 @@ export function createEngine(canvasEl, options = {}) {
       }
       
       // If not drawing: ESC clears selection first (standard CAD behavior)
-      if (state.selectedLines.length > 0) {
-        state.selectedLines.length = 0;
+      if (state.selectedSegments.length > 0) {
+        state.selectedSegments.length = 0;
         return;
       }
       
@@ -214,9 +245,11 @@ export function createEngine(canvasEl, options = {}) {
       return;
     }
 
-    if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedLines.length > 0) {
-      state.polylines = state.polylines.filter((l) => !state.selectedLines.includes(l));
-      state.selectedLines.length = 0;
+    if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedSegments.length > 0) {
+      // Delete selected segments by removing their polylines (for now - could split polylines later)
+      const polylinesToRemove = [...new Set(state.selectedSegments.map((s) => s.polyline))];
+      state.polylines = state.polylines.filter((l) => !polylinesToRemove.includes(l));
+      state.selectedSegments.length = 0;
     }
   });
 
@@ -264,32 +297,67 @@ export function createEngine(canvasEl, options = {}) {
     }
   }
 
+  function drawFilledPolygon(points, fillColor) {
+    if (points.length < 3) return;
+    ctx.fillStyle = fillColor;
+    ctx.beginPath();
+    points.forEach((p, i) => {
+      const s = viewport.toScreen(p);
+      if (i === 0) ctx.moveTo(s.x, s.y);
+      else ctx.lineTo(s.x, s.y);
+    });
+    ctx.closePath();
+    ctx.fill();
+  }
+
   function draw() {
     ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
     const scale = viewport.getScale();
 
     if (state.gridEnabled) drawGrid();
 
+    // Draw filled regions first (behind strokes)
     state.polylines.forEach((line) => {
-      if (state.selectedLines.includes(line)) {
-        drawLine(line, 'red', 2);
-      } else if (line === state.hoveredLine) {
-        drawLine(line, 'blue', 2);
-      } else {
-        drawLine(line, 'black', 1);
+      const fillColor = state.polylineFillColors.get(line);
+      if (fillColor && isClosedPolyline(line)) {
+        drawFilledPolygon(line, fillColor);
       }
     });
 
-    state.selectedLines.forEach((line) => {
-      line.forEach((p) => {
-        const s = viewport.toScreen(p);
-        ctx.fillStyle = 'white';
-        ctx.strokeStyle = 'red';
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, HANDLE_SIZE, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-      });
+    // Draw all polylines (strokes)
+    state.polylines.forEach((line) => {
+      drawLine(line, 'black', 1);
+    });
+
+    // Highlight hovered segment
+    if (state.hoveredSegment) {
+      const { polyline, segmentIndex } = state.hoveredSegment;
+      if (segmentIndex < polyline.length - 1) {
+        drawLine([polyline[segmentIndex], polyline[segmentIndex + 1]], 'blue', 2);
+      }
+    } else if (state.hoveredLine) {
+      drawLine(state.hoveredLine, 'blue', 2);
+    }
+
+    // Highlight selected segments
+    const selectedPoints = new Set();
+    state.selectedSegments.forEach(({ polyline, segmentIndex }) => {
+      if (segmentIndex < polyline.length - 1) {
+        drawLine([polyline[segmentIndex], polyline[segmentIndex + 1]], 'red', 2);
+        selectedPoints.add(polyline[segmentIndex]);
+        selectedPoints.add(polyline[segmentIndex + 1]);
+      }
+    });
+
+    // Draw handles for selected segment endpoints
+    selectedPoints.forEach((p) => {
+      const s = viewport.toScreen(p);
+      ctx.fillStyle = 'white';
+      ctx.strokeStyle = 'red';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, HANDLE_SIZE, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
     });
 
     const worldMouse = viewport.toWorld(state.mouse);
@@ -331,8 +399,10 @@ export function createEngine(canvasEl, options = {}) {
 
   /** Phase 2: When exactly one closed polygon is selected, return area in m²; otherwise null */
   function getSelectionAreaInfo() {
-    if (state.selectedLines.length !== 1) return null;
-    const line = state.selectedLines[0];
+    // Check if all selected segments form a single closed polyline
+    const uniquePolylines = [...new Set(state.selectedSegments.map((s) => s.polyline))];
+    if (uniquePolylines.length !== 1) return null;
+    const line = uniquePolylines[0];
     if (!isClosedPolyline(line)) return null;
     const areaMm2 = polygonArea(line);
     const areaM2 = areaMm2 * MM2_TO_M2;
@@ -353,7 +423,19 @@ export function createEngine(canvasEl, options = {}) {
     getCurrentToolId: () => currentToolId,
     getTools: () => tools,
     getPolylines: () => state.polylines,
-    getSelectedLines: () => state.selectedLines,
+    getSelectedSegments: () => state.selectedSegments,
+    getSelectedLines: () => {
+      // Legacy: return unique polylines from selected segments
+      return [...new Set(state.selectedSegments.map((s) => s.polyline))];
+    },
+    setPolylineFillColor: (polyline, color) => {
+      if (color) {
+        state.polylineFillColors.set(polyline, color);
+      } else {
+        state.polylineFillColors.delete(polyline);
+      }
+    },
+    getPolylineFillColor: (polyline) => state.polylineFillColors.get(polyline) || null,
     exportDrawing,
     getSelectionAreaInfo,
     setGridEnabled,
