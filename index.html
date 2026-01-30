@@ -138,7 +138,28 @@
           </label>
           <div id="fill-controls" style="display: none; align-items: center; gap: 8px;">
             <label style="font-size: 13px; color: #444;">Fill:</label>
-            <input type="color" id="fill-color-picker" value="#e0e0e0" style="width: 40px; height: 28px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;" />
+            <select id="hatch-pattern" style="height: 28px; border-radius: 4px; padding: 2px 4px; font-size: 12px;">
+              <option value="SOLID">Solid</option>
+              <option value="ANSI31">ANSI31 (45°)</option>
+              <option value="ANSI32">ANSI32</option>
+              <option value="ANSI33">ANSI33</option>
+              <option value="ANSI34">ANSI34</option>
+              <option value="ANSI37">ANSI37 (cross)</option>
+              <option value="HORIZONTAL">Horizontal</option>
+              <option value="VERTICAL">Vertical</option>
+              <option value="BRICK">Brick</option>
+              <option value="CONCRETE">Concrete</option>
+              <option value="EARTH">Earth</option>
+              <option value="WOOD">Wood</option>
+              <option value="STEEL">Steel</option>
+              <option value="DOTS">Dots</option>
+            </select>
+            <input
+              type="color"
+              id="fill-color-picker"
+              value="#e0e0e0"
+              style="width: 40px; height: 28px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;"
+            />
             <button id="btn-fill-apply" class="btn" style="padding: 6px 12px; font-size: 12px;">Apply</button>
             <button id="btn-fill-clear" class="btn" style="padding: 6px 12px; font-size: 12px;">Clear</button>
           </div>

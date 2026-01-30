@@ -12,9 +12,13 @@ const gridToggle = document.getElementById('grid-toggle');
 const btnExport = document.getElementById('btn-export');
 const areaDisplay = document.getElementById('area-display');
 const fillControls = document.getElementById('fill-controls');
+const hatchPatternSelect = document.getElementById('hatch-pattern');
 const fillColorPicker = document.getElementById('fill-color-picker');
 const btnFillApply = document.getElementById('btn-fill-apply');
 const btnFillClear = document.getElementById('btn-fill-clear');
+
+// Track last UI state so we don't keep overwriting user selection every 150ms
+let lastFillUiKey = null;
 
 const engine = createEngine(canvas, {
   initialScale: 1 / 100,
@@ -69,22 +73,45 @@ function updateFillControls() {
     
     if (isClosed) {
       fillControls.style.display = 'flex';
-      const currentColor = engine.getPolylineFillColor(polyline);
-      if (currentColor) {
-        fillColorPicker.value = currentColor;
+
+      const hatch = engine.getPolylineHatch(polyline);
+      const currentHatchPattern = hatch?.pattern || 'SOLID';
+      const currentHatchColor =
+        hatch?.color || engine.getPolylineFillColor(polyline) || fillColorPicker.value;
+
+      // Use polyline index as a simple stable id for the session
+      const polyIndex = engine.getPolylines().indexOf(polyline);
+      const key = `${polyIndex}:${currentHatchPattern}:${currentHatchColor}`;
+
+      // Only update the controls when underlying state changed
+      if (key !== lastFillUiKey) {
+        hatchPatternSelect.value = currentHatchPattern;
+        fillColorPicker.value = currentHatchColor;
+        lastFillUiKey = key;
       }
+
       return;
     }
   }
   
   fillControls.style.display = 'none';
+  lastFillUiKey = null;
 }
 
 btnFillApply.addEventListener('click', () => {
   const selectedSegments = engine.getSelectedSegments();
   const uniquePolylines = [...new Set(selectedSegments.map((s) => s.polyline))];
   if (uniquePolylines.length === 1) {
-    engine.setPolylineFillColor(uniquePolylines[0], fillColorPicker.value);
+    const polyline = uniquePolylines[0];
+    const pattern = hatchPatternSelect.value || 'SOLID';
+    const color = fillColorPicker.value;
+    if (pattern === 'SOLID') {
+      engine.setPolylineFillColor(polyline, color);
+      engine.setPolylineHatch(polyline, null, null);
+    } else {
+      engine.setPolylineFillColor(polyline, null);
+      engine.setPolylineHatch(polyline, pattern, color);
+    }
   }
 });
 
@@ -92,7 +119,9 @@ btnFillClear.addEventListener('click', () => {
   const selectedSegments = engine.getSelectedSegments();
   const uniquePolylines = [...new Set(selectedSegments.map((s) => s.polyline))];
   if (uniquePolylines.length === 1) {
-    engine.setPolylineFillColor(uniquePolylines[0], null);
+    const polyline = uniquePolylines[0];
+    engine.setPolylineFillColor(polyline, null);
+    engine.setPolylineHatch(polyline, null, null);
   }
 });
 

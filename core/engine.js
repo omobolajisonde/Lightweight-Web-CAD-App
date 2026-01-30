@@ -5,6 +5,7 @@
 import { createViewport } from './viewport.js';
 import { createTools } from '../tools/index.js';
 import { buildStructuredDrawing } from './export.js';
+import { renderHatch } from '../patterns/hatch.js';
 import {
   distance,
   SNAP_DIST,
@@ -27,7 +28,8 @@ export function createEngine(canvasEl, options = {}) {
 
   const state = {
     polylines: [],
-    polylineFillColors: new Map(), // Map<polyline, fillColor> for closed regions
+    polylineFillColors: new Map(), // Map<polyline, fillColor> for solid fills
+    polylineHatch: new Map(), // Map<polyline, { pattern: string, color: string }>
     selectedSegments: [], // [{ polyline, segmentIndex }, ...] for segment-level selection
     hoveredLine: null,
     hoveredSegment: null, // { polyline, segmentIndex } for segment hover
@@ -150,7 +152,10 @@ export function createEngine(canvasEl, options = {}) {
         state.selectedSegments = state.selectedSegments.filter(
           (s) => !lines.includes(s.polyline)
         );
-        lines.forEach((line) => state.polylineFillColors.delete(line));
+        lines.forEach((line) => {
+          state.polylineFillColors.delete(line);
+          state.polylineHatch.delete(line);
+        });
       },
     };
   }
@@ -316,10 +321,20 @@ export function createEngine(canvasEl, options = {}) {
 
     if (state.gridEnabled) drawGrid();
 
-    // Draw filled regions first (behind strokes)
+    // Draw filled / hatched regions first (behind strokes)
     state.polylines.forEach((line) => {
+      if (!isClosedPolyline(line)) return;
+      const hatch = state.polylineHatch.get(line);
       const fillColor = state.polylineFillColors.get(line);
-      if (fillColor && isClosedPolyline(line)) {
+
+      if (hatch && hatch.pattern && hatch.color) {
+        if (hatch.pattern === 'SOLID') {
+          drawFilledPolygon(line, hatch.color);
+        } else {
+          renderHatch(ctx, viewport, line, hatch.pattern, hatch.color);
+        }
+      } else if (fillColor) {
+        // Legacy solid fill
         drawFilledPolygon(line, fillColor);
       }
     });
@@ -436,6 +451,14 @@ export function createEngine(canvasEl, options = {}) {
       }
     },
     getPolylineFillColor: (polyline) => state.polylineFillColors.get(polyline) || null,
+    setPolylineHatch: (polyline, pattern, color) => {
+      if (pattern && color) {
+        state.polylineHatch.set(polyline, { pattern, color });
+      } else {
+        state.polylineHatch.delete(polyline);
+      }
+    },
+    getPolylineHatch: (polyline) => state.polylineHatch.get(polyline) || null,
     exportDrawing,
     getSelectionAreaInfo,
     setGridEnabled,
