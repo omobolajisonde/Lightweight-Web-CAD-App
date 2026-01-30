@@ -182,14 +182,38 @@ export function createSelectTool(engine) {
     },
 
     onClick(ctx) {
-      const { setSelectedSegments } = ctx;
+      const { setSelectedSegments, selectedSegments, shiftKey } = ctx;
       if (didJustFinishBoxSelect) {
         didJustFinishBoxSelect = false;
         return true; // consume click so we don't replace box selection with single-segment
       }
       if (isSelecting || isDragging || activeHandle) return false;
       if (hoveredSegment) {
-        setSelectedSegments([hoveredSegment]);
+        if (shiftKey) {
+          // Shift+click: toggle selection (add if not selected, remove if selected)
+          const isAlreadySelected = selectedSegments.some(
+            (s) =>
+              s.polyline === hoveredSegment.polyline &&
+              s.segmentIndex === hoveredSegment.segmentIndex
+          );
+          if (isAlreadySelected) {
+            // Remove from selection
+            const newSelection = selectedSegments.filter(
+              (s) =>
+                !(
+                  s.polyline === hoveredSegment.polyline &&
+                  s.segmentIndex === hoveredSegment.segmentIndex
+                )
+            );
+            setSelectedSegments(newSelection);
+          } else {
+            // Add to selection
+            setSelectedSegments([...selectedSegments, hoveredSegment]);
+          }
+        } else {
+          // Normal click: replace selection
+          setSelectedSegments([hoveredSegment]);
+        }
         return true;
       }
       return false;

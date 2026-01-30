@@ -207,6 +207,7 @@ export function createEngine(canvasEl, options = {}) {
     const worldMouse = viewport.toWorld({ x: e.offsetX, y: e.offsetY });
     const tool = getCurrentTool();
     const toolCtx = buildToolContext(worldMouse);
+    toolCtx.shiftKey = e.shiftKey; // Pass shift key state for multi-select
     if (tool.onClick && tool.onClick(toolCtx)) return;
   });
 
