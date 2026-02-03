@@ -1,39 +1,92 @@
 /**
- * Entry point: mounts the CAD engine and wires the toolbar.
- * Phase 1: Export JSON. Phase 2: Grid snap, rooms/area.
+ * Entry point: mounts the CAD engine and wires the StackBlitz-style toolbar.
+ * Integrates: tools (Select, Line, Polyline, Circle, Arc, Filled Region), View, Line Settings,
+ * toggles (Lineweights, 1m Grid, Building Gridlines), Selection (area + fill), Export.
  */
 
 import { createEngine } from './core/engine.js';
 
 const canvas = document.getElementById('canvas');
-const lineBtn = document.getElementById('tool-line');
-const selectBtn = document.getElementById('tool-select');
+const btnSelect = document.getElementById('btn-select');
+const btnLine = document.getElementById('btn-line');
+const btnPolyline = document.getElementById('btn-polyline');
+const btnCircle = document.getElementById('btn-circle');
+const btnArc = document.getElementById('btn-arc');
+const btnFilledRegion = document.getElementById('btn-filled-region');
 const gridToggle = document.getElementById('grid-toggle');
+const viewToggle = document.getElementById('view-toggle');
+const keyrefToggle = document.getElementById('keyref-toggle');
 const btnExport = document.getElementById('btn-export');
+const btnRotateView = document.getElementById('btn-rotate-view');
+const btnFitSheets = document.getElementById('btn-fit-sheets');
+const activeViewReadout = document.getElementById('active-view-readout');
 const areaDisplay = document.getElementById('area-display');
 const fillControls = document.getElementById('fill-controls');
 const hatchPatternSelect = document.getElementById('hatch-pattern');
 const fillColorPicker = document.getElementById('fill-color-picker');
 const btnFillApply = document.getElementById('btn-fill-apply');
 const btnFillClear = document.getElementById('btn-fill-clear');
+const lineTypeSelector = document.getElementById('line-type-selector');
+const styleDash = document.getElementById('style-dash');
+const angleSnapMode = document.getElementById('angle-snap-mode');
+const scaleSelector = document.getElementById('scale-selector');
 
-// Track last UI state so we don't keep overwriting user selection every 150ms
 let lastFillUiKey = null;
 
 const engine = createEngine(canvas, {
   initialScale: 1 / 100,
   initialOffset: { x: 50, y: 50 },
   onToolChange(id) {
-    lineBtn.classList.toggle('active', id === 'line');
-    selectBtn.classList.toggle('active', id === 'select');
+    btnSelect.classList.toggle('active', id === 'select');
+    btnLine.classList.toggle('active', id === 'line');
+    btnPolyline.classList.toggle('active', id === 'line');
+    btnCircle.classList.toggle('active', id === 'circle');
+    btnArc.classList.toggle('active', id === 'arc');
+    btnFilledRegion.classList.toggle('active', id === 'filledRegion');
+  },
+  onActiveViewChange(viewId) {
+    if (activeViewReadout) {
+      const label = viewId ? String(viewId).charAt(0).toUpperCase() + String(viewId).slice(1) : 'Plan';
+      activeViewReadout.innerHTML = `Active view is ${label}<br />Tip: click a paper sheet to activate it`;
+    }
   },
 });
 
-lineBtn.addEventListener('click', () => engine.setTool('line'));
-selectBtn.addEventListener('click', () => engine.setTool('select'));
+// Initialise engine angle snap mode from UI (default: "always")
+if (angleSnapMode) {
+  engine.setAngleSnapMode(angleSnapMode.value || 'always');
+}
+
+// Tool buttons: Line and Polyline both use 'line' tool
+btnSelect.addEventListener('click', () => engine.setTool('select'));
+btnLine.addEventListener('click', () => engine.setTool('line'));
+btnPolyline.addEventListener('click', () => engine.setTool('line'));
+btnCircle.addEventListener('click', () => engine.setTool('circle'));
+btnArc.addEventListener('click', () => engine.setTool('arc'));
+btnFilledRegion.addEventListener('click', () => engine.setTool('filledRegion'));
 
 gridToggle.addEventListener('change', () => {
   engine.setGridEnabled(gridToggle.checked);
+});
+
+keyrefToggle.addEventListener('change', () => {
+  engine.setBuildingGridlinesEnabled(keyrefToggle.checked);
+});
+
+angleSnapMode.addEventListener('change', () => {
+  engine.setAngleSnapMode(angleSnapMode.value);
+});
+
+scaleSelector.addEventListener('change', () => {
+  engine.setScaleFromDenom(Number(scaleSelector.value) || 100);
+});
+
+btnRotateView.addEventListener('click', () => {
+  engine.rotateView(-90); // clockwise
+});
+
+btnFitSheets.addEventListener('click', () => {
+  engine.fitToSheets(40);
 });
 
 btnExport.addEventListener('click', () => {
@@ -61,29 +114,27 @@ function updateAreaDisplay() {
 function updateFillControls() {
   const selectedSegments = engine.getSelectedSegments();
   const uniquePolylines = [...new Set(selectedSegments.map((s) => s.polyline))];
-  
-  // Show fill controls if exactly one closed polyline is selected
+
   if (uniquePolylines.length === 1) {
     const polyline = uniquePolylines[0];
-    const isClosed = polyline.length >= 3 && 
+    const isClosed =
+      polyline.length >= 3 &&
       Math.hypot(
         polyline[0].x - polyline[polyline.length - 1].x,
         polyline[0].y - polyline[polyline.length - 1].y
-      ) < 1; // Closed tolerance
-    
+      ) < 1;
+
     if (isClosed) {
-      fillControls.style.display = 'flex';
+      fillControls.classList.add('visible');
 
       const hatch = engine.getPolylineHatch(polyline);
       const currentHatchPattern = hatch?.pattern || 'SOLID';
       const currentHatchColor =
         hatch?.color || engine.getPolylineFillColor(polyline) || fillColorPicker.value;
 
-      // Use polyline index as a simple stable id for the session
       const polyIndex = engine.getPolylines().indexOf(polyline);
       const key = `${polyIndex}:${currentHatchPattern}:${currentHatchColor}`;
 
-      // Only update the controls when underlying state changed
       if (key !== lastFillUiKey) {
         hatchPatternSelect.value = currentHatchPattern;
         fillColorPicker.value = currentHatchColor;
@@ -93,8 +144,8 @@ function updateFillControls() {
       return;
     }
   }
-  
-  fillControls.style.display = 'none';
+
+  fillControls.classList.remove('visible');
   lastFillUiKey = null;
 }
 
@@ -124,6 +175,31 @@ btnFillClear.addEventListener('click', () => {
     engine.setPolylineHatch(polyline, null, null);
   }
 });
+
+// Line type / dash: optional future use (engine could use for stroke style)
+lineTypeSelector.addEventListener('change', () => {});
+styleDash.addEventListener('change', () => {});
+
+// Lineweights toggle: optional visual (e.g. thicker strokes when on)
+viewToggle.addEventListener('change', () => {});
+
+if (activeViewReadout) {
+  const viewId = engine.getActiveViewId();
+  const label = viewId ? String(viewId).charAt(0).toUpperCase() + String(viewId).slice(1) : 'Plan';
+  activeViewReadout.innerHTML = `Active view is ${label}<br />Tip: click a paper sheet to activate it`;
+}
+const canvasWrapper = document.getElementById('canvas-wrapper');
+if (canvasWrapper && canvas) {
+  const resize = () => {
+    const w = canvasWrapper.clientWidth || 800;
+    const h = canvasWrapper.clientHeight || 600;
+    canvas.width = w;
+    canvas.height = h;
+  };
+  resize();
+  window.addEventListener('resize', resize);
+}
+engine.fitToSheets(40);
 
 setInterval(() => {
   updateAreaDisplay();

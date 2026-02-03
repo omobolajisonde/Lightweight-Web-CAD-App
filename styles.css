@@ -1,0 +1,226 @@
+/**
+ * CAD app styles – StackBlitz-style layout, integrated with our engine.
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  font-family: system-ui, Arial, sans-serif;
+  background: #2c3e50;
+  overflow: hidden;
+}
+
+#toolbar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 240px;
+  padding: 14px;
+  background: #1f2b36;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+#toolbar h2 {
+  color: white;
+  margin: 0 0 10px 0;
+  font-size: 16px;
+}
+
+#toolbar button {
+  width: 100%;
+  padding: 8px;
+  margin: 6px 0;
+  border: none;
+  border-radius: 6px;
+  background: #34495e;
+  color: white;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+#toolbar button:hover {
+  background: #415b76;
+}
+
+#toolbar button.active {
+  background: #2ecc71;
+  color: #102018;
+  font-weight: bold;
+}
+
+#toolbar label {
+  display: block;
+  color: #bdc3c7;
+  font-size: 12px;
+  margin-top: 10px;
+}
+
+#toolbar select {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #2c3e50;
+  background: #22313f;
+  color: white;
+  box-sizing: border-box;
+  margin-top: 6px;
+}
+
+.style-editor {
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.style-editor h3 {
+  margin: 0 0 8px 0;
+  color: white;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+#canvas-wrapper {
+  position: fixed;
+  left: 240px;
+  top: 0;
+  width: calc(100vw - 240px);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #444;
+}
+
+#canvas {
+  display: block;
+  background: white;
+  border: 2px solid #333;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+  cursor: crosshair;
+}
+
+.switch-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 22px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #34495e;
+  transition: 0.2s;
+  border-radius: 22px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: 0.2s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #2ecc71;
+}
+
+input:checked + .slider:before {
+  transform: translateX(22px);
+}
+
+#active-view-readout {
+  font-size: 11px;
+  color: #bdc3c7;
+  line-height: 1.35;
+  padding-top: 6px;
+}
+
+#selection-section {
+  margin-top: 12px;
+}
+
+#selection-section .area-display {
+  font-size: 13px;
+  color: #2ecc71;
+  font-weight: 600;
+  margin: 6px 0;
+}
+
+#selection-section .area-display.empty {
+  color: #7f8c8d;
+  font-weight: normal;
+}
+
+#fill-controls {
+  margin-top: 8px;
+  display: none;
+}
+
+#fill-controls.visible {
+  display: block;
+}
+
+#fill-controls label {
+  margin-top: 6px;
+}
+
+#fill-controls select,
+#fill-controls input[type="color"] {
+  margin-top: 4px;
+}
+
+#fill-controls .btn-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+#fill-controls .btn-row button {
+  flex: 1;
+}
+
+.btn.primary {
+  background: #2ecc71;
+  color: #102018;
+  font-weight: bold;
+}
+
+.btn.primary:hover {
+  background: #27ae60;
+}

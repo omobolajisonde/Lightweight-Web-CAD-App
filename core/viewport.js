@@ -1,9 +1,15 @@
 /**
- * Viewport: canvas element, scale, offset, and zoom-to-pointer.
+ * Viewport: canvas element, scale, offset, rotation, and zoom-to-pointer.
  * Uses utils/transform for world ↔ screen conversion.
  */
 
 import { worldToScreen, screenToWorld } from '../utils/transform.js';
+
+function rotatePoint(p, angleRad) {
+  const c = Math.cos(angleRad);
+  const s = Math.sin(angleRad);
+  return { x: p.x * c - p.y * s, y: p.x * s + p.y * c };
+}
 
 export function createViewport(canvasEl, options = {}) {
   const scale = options.initialScale ?? 1 / 100;
@@ -14,6 +20,7 @@ export function createViewport(canvasEl, options = {}) {
     ctx: canvasEl.getContext('2d'),
     scale,
     offset: { ...offset },
+    rotationRad: 0,
   };
 
   function getScale() {
@@ -22,6 +29,10 @@ export function createViewport(canvasEl, options = {}) {
 
   function getOffset() {
     return { ...state.offset };
+  }
+
+  function getRotationRad() {
+    return state.rotationRad;
   }
 
   function setScale(s) {
@@ -33,24 +44,59 @@ export function createViewport(canvasEl, options = {}) {
     state.offset.y = o.y;
   }
 
+  /** Add rotation in radians (e.g. Math.PI/2 for 90° clockwise). */
+  function rotateBy(angleRad) {
+    state.rotationRad += angleRad;
+  }
+
+  function setRotationRad(angleRad) {
+    state.rotationRad = angleRad;
+  }
+
   function toScreen(p) {
-    return worldToScreen(p, state.scale, state.offset);
+    const rotated = rotatePoint(p, -state.rotationRad);
+    return worldToScreen(rotated, state.scale, state.offset);
   }
 
   function toWorld(p) {
-    return screenToWorld(p, state.scale, state.offset);
+    const rotated = screenToWorld(p, state.scale, state.offset);
+    return rotatePoint(rotated, state.rotationRad);
   }
 
   /**
    * Zoom toward a screen point (e.g. mouse). Call from wheel handler.
    */
   function zoomAt(screenPoint, deltaY) {
-    const mouseWorld = screenToWorld(screenPoint, state.scale, state.offset);
+    const mouseWorld = toWorld(screenPoint);
     const zoom = deltaY < 0 ? 1.1 : 0.9;
     state.scale *= zoom;
-    const newScreen = worldToScreen(mouseWorld, state.scale, state.offset);
+    const newScreen = toScreen(mouseWorld);
     state.offset.x += screenPoint.x - newScreen.x;
     state.offset.y += screenPoint.y - newScreen.y;
+  }
+
+  /**
+   * Set scale and offset so the given world bounds fit in the canvas with padding.
+   * @param {{ minX: number, minY: number, maxX: number, maxY: number }} bounds - world units
+   * @param {number} [padding=40] - screen pixels padding
+   */
+  function fitToBounds(bounds, padding = 40) {
+    const w = state.canvas.width;
+    const h = state.canvas.height;
+    const pad = padding;
+    const usableW = w - 2 * pad;
+    const usableH = h - 2 * pad;
+    const rangeX = bounds.maxX - bounds.minX;
+    const rangeY = bounds.maxY - bounds.minY;
+    if (rangeX <= 0 || rangeY <= 0) return;
+    const scaleX = usableW / rangeX;
+    const scaleY = usableH / rangeY;
+    state.scale = Math.min(scaleX, scaleY);
+    const cx = (bounds.minX + bounds.maxX) / 2;
+    const cy = (bounds.minY + bounds.maxY) / 2;
+    const screenC = worldToScreen(rotatePoint({ x: cx, y: cy }, -state.rotationRad), state.scale, { x: 0, y: 0 });
+    state.offset.x = w / 2 - screenC.x;
+    state.offset.y = h / 2 - screenC.y;
   }
 
   function installWheelHandler() {
@@ -69,11 +115,15 @@ export function createViewport(canvasEl, options = {}) {
     },
     getScale,
     getOffset,
+    getRotationRad,
     setScale,
     setOffset,
+    setRotationRad,
+    rotateBy,
     toScreen,
     toWorld,
     zoomAt,
+    fitToBounds,
     installWheelHandler,
   };
 }

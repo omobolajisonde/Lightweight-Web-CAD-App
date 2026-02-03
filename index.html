@@ -2,171 +2,136 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Lightweight Web CAD – Phase 1 & 2</title>
-
-    <style>
-      body {
-        margin: 0;
-        height: 100vh;
-        background: #e5e5e5;
-        font-family: Arial, sans-serif;
-      }
-
-      #app {
-        display: flex;
-        height: 100vh;
-      }
-
-      /* LEFT TOOLBAR */
-      #toolbar {
-        width: 80px;
-        background: #2c2c2c;
-        display: flex;
-        flex-direction: column;
-        padding: 10px;
-        gap: 10px;
-      }
-
-      .tool {
-        padding: 10px;
-        border: none;
-        background: #444;
-        color: white;
-        cursor: pointer;
-        border-radius: 4px;
-      }
-
-      .tool:hover {
-        background: #666;
-      }
-
-      .tool.active {
-        background: #1e90ff;
-      }
-
-      /* WORKSPACE */
-      #container {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-      }
-
-      #top-bar {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        margin-bottom: 10px;
-        flex-wrap: wrap;
-      }
-
-      #label {
-        font-size: 14px;
-        color: #444;
-      }
-
-      #area-display {
-        font-size: 14px;
-        color: #1976d2;
-        font-weight: 600;
-      }
-
-      #area-display.empty {
-        color: #888;
-        font-weight: normal;
-      }
-
-      .grid-option {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 13px;
-        color: #444;
-      }
-
-      .btn {
-        padding: 8px 14px;
-        border: none;
-        background: #2c2c2c;
-        color: white;
-        cursor: pointer;
-        border-radius: 4px;
-        font-size: 13px;
-      }
-
-      .btn:hover {
-        background: #444;
-      }
-
-      .btn.primary {
-        background: #1e90ff;
-      }
-
-      .btn.primary:hover {
-        background: #1a7fd9;
-      }
-
-      canvas {
-        width: 840px;
-        height: 594px;
-        background: white;
-        border: 2px solid #333;
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
-        cursor: crosshair;
-      }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lightweight Web CAD</title>
+    <link rel="stylesheet" href="./styles.css" />
   </head>
-
   <body>
-    <div id="app">
-      <!-- LEFT TOOLBAR -->
-      <div id="toolbar">
-        <button id="tool-line" class="tool active">Line</button>
-        <button id="tool-select" class="tool">Select</button>
+    <div id="toolbar">
+      <h2>Drafting Tools</h2>
+
+      <div class="style-editor">
+        <h3>View</h3>
+        <button id="btn-rotate-view">Rotate View</button>
+        <button id="btn-fit-sheets">Fit to sheets</button>
+        <div id="active-view-readout">
+          Active view is Plan<br />Hold Space + drag to pan, wheel to zoom
+        </div>
       </div>
 
-      <!-- DRAWING AREA -->
-      <div id="container">
-        <div id="top-bar">
-          <span id="label">A3 Paper – Scale 1:100 (mm), area in m²</span>
-          <span id="area-display" class="empty">Select a closed shape for area</span>
-          <span id="line-hint" style="font-size: 12px; color: #666;">Line: Esc or double‑click to finish</span>
-          <label class="grid-option">
-            <input type="checkbox" id="grid-toggle" checked />
-            Grid snap
-          </label>
-          <div id="fill-controls" style="display: none; align-items: center; gap: 8px;">
-            <label style="font-size: 13px; color: #444;">Fill:</label>
-            <select id="hatch-pattern" style="height: 28px; border-radius: 4px; padding: 2px 4px; font-size: 12px;">
-              <option value="SOLID">Solid</option>
-              <option value="ANSI31">ANSI31 (45°)</option>
-              <option value="ANSI32">ANSI32</option>
-              <option value="ANSI33">ANSI33</option>
-              <option value="ANSI34">ANSI34</option>
-              <option value="ANSI37">ANSI37 (cross)</option>
-              <option value="HORIZONTAL">Horizontal</option>
-              <option value="VERTICAL">Vertical</option>
-              <option value="BRICK">Brick</option>
-              <option value="CONCRETE">Concrete</option>
-              <option value="EARTH">Earth</option>
-              <option value="WOOD">Wood</option>
-              <option value="STEEL">Steel</option>
-              <option value="DOTS">Dots</option>
-            </select>
-            <input
-              type="color"
-              id="fill-color-picker"
-              value="#e0e0e0"
-              style="width: 40px; height: 28px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;"
-            />
-            <button id="btn-fill-apply" class="btn" style="padding: 6px 12px; font-size: 12px;">Apply</button>
-            <button id="btn-fill-clear" class="btn" style="padding: 6px 12px; font-size: 12px;">Clear</button>
-          </div>
-          <button id="btn-export" class="btn primary">Export JSON</button>
-        </div>
-        <canvas id="canvas" width="840" height="594"></canvas>
+      <button id="btn-select" class="active">Select</button>
+      <button id="btn-line">Line</button>
+      <button id="btn-polyline">Polyline</button>
+      <button id="btn-circle">Circle</button>
+      <button id="btn-arc">Arc</button>
+      <button id="btn-filled-region">Filled Region</button>
+
+      <div class="style-editor">
+        <h3>Line Settings</h3>
+        <label>Line Type</label>
+        <select id="line-type-selector">
+          <option value="detail_line">Detail Line</option>
+          <option value="ground_line">Ground Line</option>
+          <option value="overhead_line">Overhead Line</option>
+          <option value="pen_01">Pen 0.10</option>
+          <option value="pen_02">Pen 0.25</option>
+          <option value="pen_03">Pen 0.35</option>
+          <option value="pen_05">Pen 0.50</option>
+          <option value="pen_07">Pen 0.70</option>
+          <option value="pen_10">Pen 1.00</option>
+          <option value="pen_14">Pen 1.40</option>
+          <option value="pen_20">Pen 2.00</option>
+          <option value="pen_30">Pen 3.00</option>
+        </select>
+        <label>Pattern</label>
+        <select id="style-dash">
+          <option value="solid">Solid</option>
+          <option value="dashed">Dashed</option>
+          <option value="dotted">Dotted</option>
+        </select>
+        <label>Angle Snap</label>
+        <select id="angle-snap-mode">
+          <option value="off">Off</option>
+          <option value="shift">Shift-only</option>
+          <option value="always" selected>Always</option>
+        </select>
+        <label>Scale</label>
+        <select id="scale-selector">
+          <option value="50">1:50</option>
+          <option value="100" selected>1:100</option>
+          <option value="200">1:200</option>
+          <option value="500">1:500</option>
+        </select>
       </div>
+
+      <div class="switch-container">
+        <div>
+          <h3 style="margin:0; padding:0; color:white;">Lineweights</h3>
+          <div style="font-size:11px; color:#bdc3c7;">Wireframe to weighted</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="view-toggle" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="switch-container">
+        <div>
+          <h3 style="margin:0; padding:0; color:white;">1m Grid</h3>
+          <div style="font-size:11px; color:#bdc3c7;">Show or hide background grid</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="grid-toggle" checked />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="switch-container">
+        <div>
+          <h3 style="margin:0; padding:0; color:white;">Building Gridlines</h3>
+          <div style="font-size:11px; color:#bdc3c7;">Show or hide building grid</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="keyref-toggle" checked />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div id="selection-section" class="style-editor">
+        <h3>Selection</h3>
+        <div id="area-display" class="area-display empty">Select a closed shape for area</div>
+        <div id="fill-controls">
+          <label>Fill pattern</label>
+          <select id="hatch-pattern">
+            <option value="SOLID">Solid</option>
+            <option value="ANSI31">ANSI31 (45°)</option>
+            <option value="ANSI32">ANSI32</option>
+            <option value="ANSI33">ANSI33</option>
+            <option value="ANSI34">ANSI34</option>
+            <option value="ANSI37">ANSI37 (cross)</option>
+            <option value="HORIZONTAL">Horizontal</option>
+            <option value="VERTICAL">Vertical</option>
+            <option value="BRICK">Brick</option>
+            <option value="CONCRETE">Concrete</option>
+            <option value="EARTH">Earth</option>
+            <option value="WOOD">Wood</option>
+            <option value="STEEL">Steel</option>
+            <option value="DOTS">Dots</option>
+          </select>
+          <label>Fill color</label>
+          <input type="color" id="fill-color-picker" value="#e0e0e0" style="width:100%; height:32px; border:1px solid #2c3e50; border-radius:6px; cursor:pointer; background:#22313f;" />
+          <div class="btn-row">
+            <button id="btn-fill-apply">Apply</button>
+            <button id="btn-fill-clear">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <button id="btn-export" class="btn primary">Export JSON</button>
+    </div>
+
+    <div id="canvas-wrapper">
+      <canvas id="canvas"></canvas>
     </div>
 
     <script type="module" src="./index.js"></script>

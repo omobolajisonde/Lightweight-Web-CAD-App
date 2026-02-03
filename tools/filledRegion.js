@@ -1,6 +1,6 @@
 /**
- * Line (polyline) tool: click to add points, click near first point to close.
- * Supports angle snapping: global H/V axes and 45°/90° relative to previous segment.
+ * Filled Region tool: click to add vertices, double-click or click first point to close.
+ * Adds a closed polyline; fill can be applied via Selection UI.
  */
 
 import {
@@ -14,18 +14,44 @@ import {
 } from '../utils/math.js';
 
 /**
- * @param {import('../core/engine.js').Engine} engine
+ * @param {{ getState: function, viewport: object }} engine
  * @returns {import('./types.js').Tool}
  */
-export function createLineTool(engine) {
+export function createFilledRegionTool(engine) {
   let current = [];
 
   return {
-    id: 'line',
-    name: 'Line',
+    id: 'filledRegion',
+    name: 'Filled Region',
+
+    getCurrentPoints() {
+      return current;
+    },
+
+    cancel() {
+      current = [];
+    },
+
+    activate() {
+      current = [];
+    },
 
     deactivate() {
       current = [];
+    },
+
+    /** Returns closed points array to add, or null. Engine should add them. */
+    finish() {
+      if (current.length < 3) {
+        current = [];
+        return null;
+      }
+      const pts = current.map((p) => ({ x: p.x, y: p.y }));
+      if (distance(pts[0], pts[pts.length - 1]) > 1) {
+        pts.push({ x: pts[0].x, y: pts[0].y });
+      }
+      current = [];
+      return pts;
     },
 
     onClick(ctx) {
@@ -38,11 +64,10 @@ export function createLineTool(engine) {
       if (!snap && current.length > 0 && useAngleSnap) {
         const last = current[current.length - 1];
         const rawAngle = angleBetween(last, worldMouse);
-        
-        const snapTargets = [0, 90, 180, 270]; // Global axes
+        const snapTargets = [0, 90, 180, 270];
         if (current.length >= 2) {
           const prevAngle = angleBetween(current[current.length - 2], last);
-          const relativeAngles = [
+          snapTargets.push(
             prevAngle,
             normalizeAngle(prevAngle + 45),
             normalizeAngle(prevAngle - 45),
@@ -50,17 +75,11 @@ export function createLineTool(engine) {
             normalizeAngle(prevAngle - 90),
             normalizeAngle(prevAngle + 135),
             normalizeAngle(prevAngle - 135),
-            normalizeAngle(prevAngle + 180),
-          ];
-          snapTargets.push(...relativeAngles);
+            normalizeAngle(prevAngle + 180)
+          );
         }
-        
         const snappedAngle = snapAngle(rawAngle, snapTargets, ANGLE_SNAP_TOLERANCE);
-        if (snappedAngle !== null) {
-          p = constrainToAngle(last, worldMouse, snappedAngle);
-        } else {
-          p = { x: worldMouse.x, y: worldMouse.y };
-        }
+        if (snappedAngle !== null) p = constrainToAngle(last, worldMouse, snappedAngle);
       } else {
         p = { x: p.x, y: p.y };
       }
@@ -82,7 +101,7 @@ export function createLineTool(engine) {
     },
 
     draw(ctx) {
-      const { viewport, mouse, getSnap, polylines, selectedLines, angleSnapMode, shiftKey } = ctx;
+      const { viewport, mouse, getSnap, gfx, angleSnapMode, shiftKey } = ctx;
       const scale = viewport.getScale();
       const toScreen = viewport.toScreen.bind(viewport);
       const useAngleSnap = angleSnapMode === 'always' || (angleSnapMode === 'shift' && shiftKey);
@@ -92,34 +111,24 @@ export function createLineTool(engine) {
       if (!snap && current.length > 0 && useAngleSnap) {
         const last = current[current.length - 1];
         const rawAngle = angleBetween(last, ctx.worldMouse);
-        
-        // Build snap targets: global axes + relative angles
-        const snapTargets = [0, 90, 180, 270]; // Global horizontal/vertical
-        
-        // If we have at least one complete segment (2+ points), add relative angles
+        const snapTargets = [0, 90, 180, 270];
         if (current.length >= 2) {
           const prevAngle = angleBetween(current[current.length - 2], last);
-          // Add relative angles: same, ±45°, ±90°, ±135°, 180°
-          const relativeAngles = [
-            prevAngle, // Same direction
+          snapTargets.push(
+            prevAngle,
             normalizeAngle(prevAngle + 45),
             normalizeAngle(prevAngle - 45),
             normalizeAngle(prevAngle + 90),
             normalizeAngle(prevAngle - 90),
             normalizeAngle(prevAngle + 135),
             normalizeAngle(prevAngle - 135),
-            normalizeAngle(prevAngle + 180),
-          ];
-          snapTargets.push(...relativeAngles);
+            normalizeAngle(prevAngle + 180)
+          );
         }
-        
         const snappedAngle = snapAngle(rawAngle, snapTargets, ANGLE_SNAP_TOLERANCE);
-        if (snappedAngle !== null) {
-          worldMouse = constrainToAngle(last, ctx.worldMouse, snappedAngle);
-        }
+        if (snappedAngle !== null) worldMouse = constrainToAngle(last, ctx.worldMouse, snappedAngle);
       }
 
-      const gfx = ctx.gfx;
       const drawLine = (points) => {
         gfx.beginPath();
         points.forEach((p, i) => {
@@ -130,7 +139,6 @@ export function createLineTool(engine) {
         gfx.stroke();
       };
 
-      // Highlight close-shape affordance
       if (current.length >= 2) {
         const first = current[0];
         if (distance(worldMouse, first) < CLOSE_LOOP_THRESHOLD / scale) {
@@ -143,7 +151,6 @@ export function createLineTool(engine) {
         }
       }
 
-      // Preview segment
       if (current.length > 0) {
         const last = current[current.length - 1];
         gfx.strokeStyle = 'black';
@@ -154,10 +161,6 @@ export function createLineTool(engine) {
         gfx.font = '12px Arial';
         gfx.fillText(`${len}`, mouse.x + 10, mouse.y - 10);
       }
-    },
-
-    getCurrentPoints() {
-      return current;
     },
   };
 }

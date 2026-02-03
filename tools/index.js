@@ -7,11 +7,20 @@
 
 import { createLineTool } from './line.js';
 import { createSelectTool } from './select.js';
+import { createCircleTool } from './circle.js';
+import { createArcTool } from './arc.js';
+import { createFilledRegionTool } from './filledRegion.js';
 
 /**
- * @param {import('../core/engine.js').Engine} engine
+ * @param {{ getState: function, viewport: object }} engine
  * @returns {import('./types.js').Tool[]}
  */
 export function createTools(engine) {
-  return [createLineTool(engine), createSelectTool(engine)];
+  return [
+    createSelectTool(engine),
+    createLineTool(engine),
+    createCircleTool(engine),
+    createArcTool(engine),
+    createFilledRegionTool(engine),
+  ];
 }

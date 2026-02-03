@@ -9,24 +9,42 @@
 const PATTERNS = {
   SOLID: { type: 'solid' },
 
-  // 45° diagonal lines, medium spacing
+  // ANSI31–34: tuned to roughly match acadiso.pat spacing
+  // *ANSI31: single 45° family, spacing 3.175mm
   ANSI31: {
     type: 'lines',
-    lines: [{ angleDeg: 45, spacingMm: 300, dashMm: [Infinity] }],
+    lines: [{ angleDeg: 45, spacingMm: 3.175, dashMm: [Infinity] }],
   },
 
-  // Same orientation, different densities
+  // *ANSI32: 45° with a second offset family, spacing 9.525mm
   ANSI32: {
     type: 'lines',
-    lines: [{ angleDeg: 45, spacingMm: 200, dashMm: [Infinity] }],
+    lines: [
+      { angleDeg: 45, spacingMm: 9.525, dashMm: [Infinity] },
+      { angleDeg: 45, spacingMm: 9.525, dashMm: [Infinity], offsetX: 4.49013 },
+    ],
   },
+
+  // *ANSI33: 45° with spaced dashes on the offset family
+  // First family: solid, spacing 6.35mm
+  // Second family: same spacing, offset with dash/gap segments (3.175mm dash, ~1.5875mm gap)
   ANSI33: {
     type: 'lines',
-    lines: [{ angleDeg: 45, spacingMm: 100, dashMm: [Infinity] }],
+    lines: [
+      { angleDeg: 45, spacingMm: 6.35, dashMm: [Infinity] },
+      { angleDeg: 45, spacingMm: 6.35, dashMm: [3.175, 1.5875], offsetX: 4.49013 },
+    ],
   },
+
+  // *ANSI34: multiple 45° families, wider spacing
   ANSI34: {
     type: 'lines',
-    lines: [{ angleDeg: 45, spacingMm: 50, dashMm: [Infinity] }],
+    lines: [
+      { angleDeg: 45, spacingMm: 19.05, dashMm: [Infinity] },
+      { angleDeg: 45, spacingMm: 19.05, dashMm: [Infinity], offsetX: 4.49013 },
+      { angleDeg: 45, spacingMm: 19.05, dashMm: [Infinity], offsetX: 8.98026 },
+      { angleDeg: 45, spacingMm: 19.05, dashMm: [Infinity], offsetX: 13.4704 },
+    ],
   },
 
   // Cross hatch
@@ -140,7 +158,8 @@ export function renderHatch(ctx, viewport, polygonWorld, patternName, color) {
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2;
   const diag = Math.hypot(maxX - minX, maxY - minY) || 1;
-  const L = diag * 2;
+  // Slightly overshoot the polygon's bounding box to guarantee coverage at all angles
+  const L = diag * 4;
 
   ctx.save();
   // Clip to polygon
@@ -229,8 +248,9 @@ export function renderHatch(ctx, viewport, polygonWorld, patternName, color) {
         if (proj > maxProj) maxProj = proj;
       }
 
-      const start = Math.floor(minProj / spacingScreen) * spacingScreen;
-      const end = Math.ceil(maxProj / spacingScreen) * spacingScreen;
+      // Expand the projected range a bit so the outermost lines don't miss the clipped polygon edges
+      const start = Math.floor((minProj - spacingScreen) / spacingScreen) * spacingScreen;
+      const end = Math.ceil((maxProj + spacingScreen) / spacingScreen) * spacingScreen;
       const lineCount = Math.round((end - start) / spacingScreen) + 1;
       if (lineCount > MAX_LINES_PER_FAMILY) continue; // skip this line family to avoid freeze
 
