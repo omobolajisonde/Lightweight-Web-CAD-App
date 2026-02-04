@@ -1,21 +1,315 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lightweight Web-CAD</title>
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body>
-    <div id="toolbar">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Drafting Tools</title>
+
+  <link rel="stylesheet" href="/styles.css" />
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+
+  <style>
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #2c3e50;
+      overflow: hidden;
+    }
+
+    /* Toolbar becomes a flex column so we can pin Export at the bottom */
+    #toolbar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 240px;
+      padding: 14px;
+      background: #1f2b36;
+      box-sizing: border-box;
+
+      display: flex;
+      flex-direction: column;
+      overflow: hidden; /* IMPORTANT: scroll happens inside .toolbar-scroll */
+    }
+
+    /* Scrollable area for the existing toolbar content */
+    .toolbar-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 6px; /* optional: avoids scrollbar overlapping content */
+    }
+
+    #toolbar h2 {
+      color: white;
+      margin: 0 0 10px 0;
+      font-size: 16px;
+    }
+
+    #toolbar button {
+      width: 100%;
+      padding: 8px;
+      margin: 6px 0;
+      border: none;
+      border-radius: 6px;
+      background: #34495e;
+      color: white;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    #toolbar button.active {
+      background: #2ecc71;
+      color: #102018;
+      font-weight: bold;
+    }
+
+    #toolbar label {
+      display: block;
+      color: #bdc3c7;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    #toolbar select {
+      width: 100%;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #2c3e50;
+      background: #22313f;
+      color: white;
+      box-sizing: border-box;
+      margin-top: 6px;
+    }
+
+    .style-editor {
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .style-editor h3 {
+      margin: 0 0 8px 0;
+      color: white;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    #canvas-wrapper {
+      position: fixed;
+      left: 240px;
+      top: 0;
+      width: calc(100vw - 240px);
+      height: 100vh;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    .switch-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 22px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #34495e;
+      transition: 0.2s;
+      border-radius: 22px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: 0.2s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: #2ecc71;
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(22px);
+    }
+
+    #guide-line {
+      position: absolute;
+      pointer-events: none;
+      z-index: 40;
+      display: none;
+    }
+
+    #active-view-readout {
+      font-size: 11px;
+      color: #bdc3c7;
+      line-height: 1.35;
+      padding-top: 6px;
+    }
+
+    /* -----------------------------------------
+       Phase 4: Plan Level Tabs (HTML overlay)
+       ----------------------------------------- */
+    #plan-tabs-root {
+      position: absolute;
+      z-index: 60;
+      display: none;
+      pointer-events: auto;
+      user-select: none;
+    }
+
+    .plan-tabs-root {
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      padding: 0;
+    }
+
+    .plan-tabs-row {
+      display: grid;
+      grid-template-columns: 70px 1fr;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .plan-tabs-row + .plan-tabs-row {
+      margin-top: 6px;
+    }
+
+    .plan-tabs-rowlabel {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.85);
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .plan-tabs {
+      display: flex;
+      gap: 0;
+      height: 22px;
+      overflow: hidden;
+      flex-wrap: nowrap;
+      border-radius: 0;
+    }
+
+    .plan-tab {
+      flex: 1 1 0;
+      height: 22px;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      margin: 0;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.92);
+      text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+    }
+
+    .plan-tab--c0 { background: #ff4d4d; }
+    .plan-tab--c1 { background: #ff9f1a; }
+    .plan-tab--c2 { background: #a855f7; }
+    .plan-tab--c3 { background: #22c55e; }
+    .plan-tab--c4 { background: #38bdf8; }
+
+    .plan-tabs-row--overlay .plan-tab {
+      opacity: 0.65;
+    }
+    .plan-tabs-row--overlay .plan-tab.is-active {
+      opacity: 1;
+    }
+
+    .plan-tab:hover {
+      background: rgba(255, 255, 255, 1);
+    }
+
+    .plan-tab.is-active {
+      outline: 2px solid rgba(255, 255, 255, 0.95);
+      outline-offset: -2px;
+    }
+
+    .plan-tab--overlay {
+      opacity: 0.55;
+    }
+
+    .plan-tabs-row--overlay .plan-tab.is-active {
+      opacity: 0.85;
+    }
+
+    /* Pinned Export section inside toolbar */
+    .toolbar-export {
+      padding-top: 10px;
+      margin-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    /* Use your toolbar button styling */
+    .toolbar-export .export-btn {
+      width: 100%;
+      padding: 8px;
+      margin: 0;
+      border: none;
+      border-radius: 6px;
+      background: #34495e;
+      color: white;
+      cursor: pointer;
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="toolbar">
+    <div class="toolbar-scroll">
       <h2>Drafting Tools</h2>
 
       <div class="style-editor">
         <h3>View</h3>
+
         <button id="btn-rotate-view">Rotate View</button>
         <button id="btn-fit-sheets">Fit to sheets</button>
+
         <div id="active-view-readout">
-          Active view is Plan<br />Hold Space + drag to pan, wheel to zoom
+          Active view is Plan
+          <br />
+          Tip click a paper sheet to activate it
         </div>
       </div>
 
@@ -24,10 +318,11 @@
       <button id="btn-polyline">Polyline</button>
       <button id="btn-circle">Circle</button>
       <button id="btn-arc">Arc</button>
-      <button id="btn-filled-region">Filled Region</button>
+      <button id="btn-filledRegion">Filled Region</button>
 
       <div class="style-editor">
         <h3>Line Settings</h3>
+
         <label>Line Type</label>
         <select id="line-type-selector">
           <option value="detail_line">Detail Line</option>
@@ -43,24 +338,27 @@
           <option value="pen_20">Pen 2.00</option>
           <option value="pen_30">Pen 3.00</option>
         </select>
+
         <label>Pattern</label>
         <select id="style-dash">
           <option value="solid">Solid</option>
           <option value="dashed">Dashed</option>
           <option value="dotted">Dotted</option>
         </select>
+
         <label>Angle Snap</label>
         <select id="angle-snap-mode">
           <option value="off">Off</option>
-          <option value="shift">Shift-only</option>
-          <option value="always" selected>Always</option>
+          <option value="shift" selected>Shift-only</option>
+          <option value="always">Always</option>
         </select>
+
         <label>Scale</label>
         <select id="scale-selector">
-          <option value="50">1:50</option>
-          <option value="100" selected>1:100</option>
-          <option value="200">1:200</option>
-          <option value="500">1:500</option>
+          <option value="50">1 50</option>
+          <option value="100" selected>1 100</option>
+          <option value="200">1 200</option>
+          <option value="500">1 500</option>
         </select>
       </div>
 
@@ -69,6 +367,7 @@
           <h3 style="margin:0; padding:0; color:white;">Lineweights</h3>
           <div style="font-size:11px; color:#bdc3c7;">Wireframe to weighted</div>
         </div>
+
         <label class="switch">
           <input type="checkbox" id="view-toggle" />
           <span class="slider"></span>
@@ -80,6 +379,7 @@
           <h3 style="margin:0; padding:0; color:white;">1m Grid</h3>
           <div style="font-size:11px; color:#bdc3c7;">Show or hide background grid</div>
         </div>
+
         <label class="switch">
           <input type="checkbox" id="grid-toggle" checked />
           <span class="slider"></span>
@@ -91,49 +391,27 @@
           <h3 style="margin:0; padding:0; color:white;">Building Gridlines</h3>
           <div style="font-size:11px; color:#bdc3c7;">Show or hide building grid</div>
         </div>
+
         <label class="switch">
           <input type="checkbox" id="keyref-toggle" checked />
           <span class="slider"></span>
         </label>
       </div>
-
-      <div id="selection-section" class="style-editor">
-        <h3>Selection</h3>
-        <div id="area-display" class="area-display empty">Select a closed shape for area</div>
-        <div id="fill-controls">
-          <label>Fill pattern</label>
-          <select id="hatch-pattern">
-            <option value="SOLID">Solid</option>
-            <option value="ANSI31">ANSI31 (45°)</option>
-            <option value="ANSI32">ANSI32</option>
-            <option value="ANSI33">ANSI33</option>
-            <option value="ANSI34">ANSI34</option>
-            <option value="ANSI37">ANSI37 (cross)</option>
-            <option value="HORIZONTAL">Horizontal</option>
-            <option value="VERTICAL">Vertical</option>
-            <option value="BRICK">Brick</option>
-            <option value="CONCRETE">Concrete</option>
-            <option value="EARTH">Earth</option>
-            <option value="WOOD">Wood</option>
-            <option value="STEEL">Steel</option>
-            <option value="DOTS">Dots</option>
-          </select>
-          <label>Fill color</label>
-          <input type="color" id="fill-color-picker" value="#e0e0e0" style="width:100%; height:32px; border:1px solid #2c3e50; border-radius:6px; cursor:pointer; background:#22313f;" />
-          <div class="btn-row">
-            <button id="btn-fill-apply">Apply</button>
-            <button id="btn-fill-clear">Clear</button>
-          </div>
-        </div>
-      </div>
-
-      <button id="btn-export" class="btn primary">Export JSON</button>
     </div>
 
-    <div id="canvas-wrapper">
-      <canvas id="canvas"></canvas>
+    <!-- Export pinned to the bottom of the toolbar -->
+    <div class="toolbar-export">
+      <button id="btnExportJson" type="button" class="export-btn">Export JSON</button>
     </div>
+  </div>
 
-    <script type="module" src="./index.js"></script>
-  </body>
+  <div id="canvas-wrapper">
+    <div id="plan-tabs-root"></div>
+    <canvas id="c"></canvas>
+    <canvas id="guide-line"></canvas>
+  </div>
+
+  <!-- Vite entry -->
+  <script type="module" src="/index.js"></script>
+</body>
 </html>
